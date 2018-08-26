@@ -203,8 +203,17 @@ extension PinLayout {
                 size = computeSizeToFit(adjustSizeType: adjustSizeType, size: size)
             case .sizeToFit:
                 size = computeSizeToFit(size: size)
-            case .aspectRatio(let ratio):
+            case .aspectRatio(let ratio, _):
                 size = computeAspectRatio(ratio, size: size)
+            }
+            
+            if let multiplier = adjustSizeType.multiplier {
+                if let width = size.width {
+                    size.width = width * multiplier.value.width
+                }
+                if let height = size.height {
+                    size.height = height * multiplier.value.height
+                }
             }
         }
 

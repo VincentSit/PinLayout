@@ -18,6 +18,7 @@
 //  THE SOFTWARE.
 
 import Foundation
+import CoreGraphics.CGGeometry
 
 
 /*
@@ -186,6 +187,32 @@ public enum WrapType {
     case horizontally
     /// Adjust only the view's height to wrap all its subviews. The view's width won't be modified.
     case vertically
+}
+
+public enum MultiplierType: ExpressibleByFloatLiteral, ExpressibleByIntegerLiteral {
+    case width(Double)
+    case height(Double)
+    case custom(CGSize)
+    
+    var value: CGSize {
+        switch self {
+        case .width(let value):
+            return CGSize(width: value, height: 1)
+        case .height(let value):
+            return CGSize(width: 1, height: value)
+        case .custom(let value):
+            return value
+        }
+    }
+    
+    public init(floatLiteral value: Float) {
+        let value = Double(value)
+        self = .custom(CGSize(width: value, height: value))
+    }
+    
+    public init(integerLiteral value: Int) {
+        self = .custom(CGSize(width: value, height: value))
+    }
 }
 
 @objc public enum LayoutDirection: Int {

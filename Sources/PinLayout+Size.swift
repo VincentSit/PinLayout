@@ -24,14 +24,14 @@ import AppKit
 #endif
 
 enum AdjustSizeType {
-    case fitTypeWidth
-    case fitTypeHeight
-    case fitTypeWidthFlexible
-    case fitTypeHeightFlexible
+    case fitTypeWidth(MultiplierType?)
+    case fitTypeHeight(MultiplierType?)
+    case fitTypeWidthFlexible(MultiplierType?)
+    case fitTypeHeightFlexible(MultiplierType?)
 
-    case sizeToFit
+    case sizeToFit(MultiplierType?)
 
-    case aspectRatio(CGFloat)
+    case aspectRatio(CGFloat, MultiplierType?)
 
     var isFlexible: Bool {
         if case .fitTypeWidthFlexible = self {
@@ -40,6 +40,23 @@ enum AdjustSizeType {
             return true
         } else {
             return false
+        }
+    }
+    
+    var multiplier: MultiplierType? {
+        switch self {
+        case let .fitTypeWidth(value):
+            return value
+        case let .fitTypeHeight(value):
+            return value
+        case let .fitTypeWidthFlexible(value):
+            return value
+        case let .fitTypeHeightFlexible(value):
+            return value
+        case let .sizeToFit(value):
+            return value
+        case let .aspectRatio(_, value):
+            return value
         }
     }
 
@@ -66,12 +83,12 @@ enum AdjustSizeType {
 }
 
 extension FitType {
-    func toAdjustSizeType() -> AdjustSizeType {
+    func toAdjustSizeType(_ multiplier: MultiplierType?) -> AdjustSizeType {
         switch self {
-        case .width: return .fitTypeWidth
-        case .height: return .fitTypeHeight
-        case .widthFlexible: return .fitTypeWidthFlexible
-        case .heightFlexible: return .fitTypeHeightFlexible
+        case .width: return .fitTypeWidth(multiplier)
+        case .height: return .fitTypeHeight(multiplier)
+        case .widthFlexible: return .fitTypeWidthFlexible(multiplier)
+        case .heightFlexible: return .fitTypeHeightFlexible(multiplier)
         }
     }
 }
@@ -113,8 +130,8 @@ extension PinLayout {
      dimensions of an item.
      */
     @discardableResult
-    public func aspectRatio(_ ratio: CGFloat) -> PinLayout {
-        return setAdjustSizeType(.aspectRatio(ratio), { "aspectRatio(\(ratio))" })
+    public func aspectRatio(_ ratio: CGFloat, multiplier: MultiplierType? = nil) -> PinLayout {
+        return setAdjustSizeType(.aspectRatio(ratio, multiplier), { "aspectRatio(\(ratio))" })
     }
 
     /**
@@ -128,9 +145,9 @@ extension PinLayout {
      dimensions of an item.
      */
     @discardableResult
-    public func aspectRatio(of view: View) -> PinLayout {
+    public func aspectRatio(of view: View, multiplier: MultiplierType? = nil) -> PinLayout {
         let rect = view.getRect(keepTransform: keepTransform)
-        return setAdjustSizeType(.aspectRatio(rect.width / rect.height), { "aspectRatio(of: \(viewDescription(view)))" })
+        return setAdjustSizeType(.aspectRatio(rect.width / rect.height, multiplier), { "aspectRatio(of: \(viewDescription(view)))" })
     }
 
     /**
@@ -141,7 +158,7 @@ extension PinLayout {
      */
     #if os(iOS) || os(tvOS)
     @discardableResult
-    public func aspectRatio() -> PinLayout {
+    public func aspectRatio(_ multiplier: MultiplierType? = nil) -> PinLayout {
         func context() -> String { return "aspectRatio()" }
         guard let imageView = view as? UIImageView else {
             warnWontBeApplied("the layouted must be an UIImageView() to use the aspectRatio() method without parameter.", context)
@@ -153,7 +170,7 @@ extension PinLayout {
             return self
         }
 
-        return setAdjustSizeType(.aspectRatio(imageSize.width / imageSize.height), context)
+        return setAdjustSizeType(.aspectRatio(imageSize.width / imageSize.height, multiplier), context)
     }
     #endif
 
@@ -216,13 +233,25 @@ extension PinLayout {
      ```
      */
     @discardableResult
-    public func sizeToFit(_ fitType: FitType) -> PinLayout {
-        return setAdjustSizeType(fitType.toAdjustSizeType(), { return "sizeToFit(\(fitType.description))" })
+    public func sizeToFit(_ fitType: FitType, multiplier: MultiplierType? = nil) -> PinLayout {
+        let context = { return "sizeToFit(\(fitType.description))" }
+        if let multiplier = multiplier {
+            let multiplierContext = { return "\(context)'s multiplier" }
+            guard validateWidth(multiplier.value.width, context: multiplierContext) else { return self }
+            guard validateHeight(multiplier.value.height, context: multiplierContext) else { return self }
+        }
+        return setAdjustSizeType(fitType.toAdjustSizeType(multiplier), context)
     }
 
     @discardableResult
-    public func sizeToFit() -> PinLayout {
-        return setAdjustSizeType(.sizeToFit, { return "sizeToFit()" })
+    public func sizeToFit(_ multiplier: MultiplierType? = nil) -> PinLayout {
+        let context = { return "sizeToFit()" }
+        if let multiplier = multiplier {
+            let multiplierContext = { return "\(context)'s multiplier" }
+            guard validateWidth(multiplier.value.width, context: multiplierContext) else { return self }
+            guard validateHeight(multiplier.value.height, context: multiplierContext) else { return self }
+        }
+        return setAdjustSizeType(.sizeToFit(multiplier), context)
     }
 }
 
@@ -242,7 +271,7 @@ extension PinLayout {
         }
 
         if let type = type {
-            if case let AdjustSizeType.aspectRatio(ratio) = type, ratio <= 0 {
+            if case let AdjustSizeType.aspectRatio(ratio, _) = type, ratio <= 0 {
                 warnWontBeApplied("the aspectRatio (\(ratio)) must be greater than zero.", context)
                 return self
             } else if type.requiresSizeCalculable, !(view is SizeCalculable) {
